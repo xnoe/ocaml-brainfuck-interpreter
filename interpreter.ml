@@ -1,4 +1,3 @@
-#load "unix.cma"
 open Printf
 
 let getchar () =
@@ -25,32 +24,25 @@ let explode s = List.init (String.length s) (String.get s)
 type op =
 	| OAdd of int
 	| OMove of int
-	| OBlock of op
+	| OBlock of op list
 	| OPList of op list
 	| OInput
 	| OOutput
 
 let parse tokens =
-	let index = ref 0 in
-	let cur () = List.nth tokens !index in
-
-	let rec buildast (): op =
-		let ast = ref [] in
-		while !index <> (List.length tokens-1) && cur () <> ']' do
-			let adda t = ast := !ast @ [t]; incr index in
-			match cur () with
-				'+' -> adda (OAdd 1)
-				|'-' -> adda (OAdd (-1))
-				|'<' -> adda (OMove (-1))
-				|'>' -> adda (OMove 1)
-				|',' -> adda OInput
-				|'.' -> adda OOutput
-				|'[' -> incr index; adda ( OBlock ( buildast () ) );
-				|_->incr index
-		done;
-		OPList (!ast)
-	in
-	buildast ()
+	let rec buildast tokens ast =
+		match tokens with
+			[] -> (ast,[])
+			|']'::tl -> (ast,tl)
+			|'+'::tl -> buildast tl (ast@[OAdd 1])
+			|'-'::tl -> buildast tl (ast@[OAdd (-1)])
+			|'<'::tl -> buildast tl (ast@[OMove (-1)])
+			|'>'::tl -> buildast tl (ast@[OMove 1])
+			|','::tl -> buildast tl (ast@[OInput])
+			|'.'::tl -> buildast tl (ast@[OOutput])
+			|'['::tl -> let join,ntl = buildast tl [] in buildast ntl (ast@[OBlock join])
+			|_::tl -> buildast tl ast
+	in let (ast,_) = buildast tokens [] in OPList ast
 
 let eval ast =
 	let tape = Array.make 30000 0 in
@@ -59,16 +51,16 @@ let eval ast =
 	let rec eval_i ast =
 		match ast with
 			OPList l -> List.iter eval_i l
-			|OBlock b -> while tape.(!ptr) <> 0 do eval_i b done
+			|OBlock b -> while tape.(!ptr) <> 0 do List.iter eval_i b done
 			|OMove n -> ptr := !ptr + n
 			|OAdd n -> (
 				tape.(!ptr)<-(tape.(!ptr)+n);
-				if tape.(!ptr) < 0 then tape.(!ptr)<-tape.(!ptr)+256;
-				if tape.(!ptr) > 255 then tape.(!ptr)<-tape.(!ptr)-256;
+				if tape.(!ptr) < 0 then tape.(!ptr)<-255;
+				if tape.(!ptr) > 255 then tape.(!ptr)<-0;
 			)
 			|OInput -> tape.(!ptr)<-Char.code (getchar ())
-			|OOutput -> (print_string (String.make 1 (Char.chr tape.(!ptr)));Format.print_flush ())
+			|OOutput -> (printf "%c" (Char.chr tape.(!ptr));Format.print_flush ())
 	in eval_i ast
 
-let () =
+let _ =
 	Sys.argv.(1) |> readfile |> explode |> parse |> eval
