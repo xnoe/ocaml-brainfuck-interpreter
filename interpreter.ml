@@ -22,8 +22,10 @@ let readfile file =
 let explode s = List.init (String.length s) (String.get s)
 
 type op =
-	| OAdd of int
-	| OMove of int
+	| ODec
+	| OInc
+	| OLeft
+	| ORight
 	| OBlock of op list
 	| OPList of op list
 	| OInput
@@ -34,10 +36,10 @@ let parse tokens =
 		match tokens with
 			[] -> (ast,[])
 			|']'::tl -> (ast,tl)
-			|'+'::tl -> buildast tl (ast@[OAdd 1])
-			|'-'::tl -> buildast tl (ast@[OAdd (-1)])
-			|'<'::tl -> buildast tl (ast@[OMove (-1)])
-			|'>'::tl -> buildast tl (ast@[OMove 1])
+			|'+'::tl -> buildast tl (ast@[OInc])
+			|'-'::tl -> buildast tl (ast@[ODec])
+			|'<'::tl -> buildast tl (ast@[OLeft])
+			|'>'::tl -> buildast tl (ast@[ORight])
 			|','::tl -> buildast tl (ast@[OInput])
 			|'.'::tl -> buildast tl (ast@[OOutput])
 			|'['::tl -> let join,ntl = buildast tl [] in buildast ntl (ast@[OBlock join])
@@ -52,14 +54,12 @@ let eval ast =
 		match ast with
 			OPList l -> List.iter eval_i l
 			|OBlock b -> while tape.(!ptr) <> 0 do List.iter eval_i b done
-			|OMove n -> ptr := !ptr + n
-			|OAdd n -> (
-				tape.(!ptr)<-(tape.(!ptr)+n);
-				if tape.(!ptr) < 0 then tape.(!ptr)<-255;
-				if tape.(!ptr) > 255 then tape.(!ptr)<-0;
-			)
+			|OLeft -> decr ptr
+			|ORight -> incr ptr
+			|OInc -> tape.(!ptr)<-tape.(!ptr)+1;
+			|ODec -> (tape.(!ptr)<-tape.(!ptr)-1; if tape.(!ptr)<0 then tape.(!ptr)<-255)
 			|OInput -> tape.(!ptr)<-Char.code (getchar ())
-			|OOutput -> (printf "%c" (Char.chr tape.(!ptr));Format.print_flush ())
+			|OOutput -> (tape.(!ptr) |> char_of_int |> String.make 1 |> print_string; Format.print_flush ())
 	in eval_i ast
 
 let _ =
