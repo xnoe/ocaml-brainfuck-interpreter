@@ -1,11 +1,9 @@
-open Printf
 #load "unix.cma"
+open Printf
 
 let getchar () =
 	let termio = Unix.tcgetattr Unix.stdin in
-	let () =
-		Unix.tcsetattr Unix.stdin Unix.TCSADRAIN
-			{ termio with Unix.c_icanon = false } in
+	 Unix.tcsetattr Unix.stdin Unix.TCSADRAIN { termio with Unix.c_icanon = false };
 	let res = input_char stdin in
 	Unix.tcsetattr Unix.stdin Unix.TCSADRAIN termio;
 	res
@@ -54,17 +52,6 @@ let parse tokens =
 	in
 	buildast ()
 
-let print_ast ast =
-	let rec print_ast_i ast =
-    match ast with
-      OPList l -> (print_string "List ["; List.iter print_ast_i l; print_string "];")
-      |OBlock b -> (print_string "Block ["; print_ast_i b; print_string "];")
-      |OMove n -> print_string ("Move " ^ (string_of_int n) ^ ";")
-      |OAdd n -> print_string ("Add " ^ (string_of_int n) ^ ";")
-      |OInput -> print_string "Input;"
-      |OOutput -> print_string "Output;"
-	in print_ast_i ast
-
 let eval ast =
 	let tape = Array.make 30000 0 in
 	let ptr = ref 0 in
@@ -76,8 +63,8 @@ let eval ast =
 			|OMove n -> ptr := !ptr + n
 			|OAdd n -> (
 				tape.(!ptr)<-(tape.(!ptr)+n);
-				if tape.(!ptr) < 0 then tape.(!ptr)<-tape.(!ptr)+255;
-				if tape.(!ptr) > 255 then tape.(!ptr)<-tape.(!ptr)-255;
+				if tape.(!ptr) < 0 then tape.(!ptr)<-tape.(!ptr)+256;
+				if tape.(!ptr) > 255 then tape.(!ptr)<-tape.(!ptr)-256;
 			)
 			|OInput -> tape.(!ptr)<-Char.code (getchar ())
 			|OOutput -> (print_string (String.make 1 (Char.chr tape.(!ptr)));Format.print_flush ())
